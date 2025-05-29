@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "name": "impressions",
+      "data": [
+        {"date": "2025-07-01", "value": 108200},
+        {"date": "2025-07-08", "value": 114500}
+      ]
+    },
+    {
+      "name": "conversions",
+      "data": [
+        {"date": "2025-07-01", "value": 1040},
+        {"date": "2025-07-08", "value": 1105}
+      ]
+    }
+  ],
+  "targets": "impressions = 150000\nconversions = 1500"
+}
