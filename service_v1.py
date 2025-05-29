@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from autogen import ConversableAgent, LLMConfig
 from autogen.agentchat import initiate_group_chat
-from autogen.agentchat.group.patterns import AutoPattern
+from autogen.agentchat.group.patterns import AutoPattern, DefaultPattern
 
 
 # ───────────────────────────────────────────────
@@ -31,14 +31,51 @@ config_list = [
     }
 ]
 llm_config = LLMConfig(config_list=config_list, temperature=1)
-
+user_input = ""
 
 # ───────────────────────────────────────────────
 # 2. Role prompts
 # ───────────────────────────────────────────────
-ANALYST_WRITER_SYS_MSG = """(same as before)"""
-FEEDBACK_SYS_MSG_TEMPLATE = """(same as before, with {user_input})"""
+ANALYST_WRITER_SYS_MSG = """
+You are **ANALYST_WRITER**.
 
+Task
+─────
+1. Analyse up to five KPI JSON blobs plus the plain-text targets supplied in the
+   very first user message.
+2. Draft a full Markdown report.
+3. Send that draft to the Feedback agent for validation.
+
+If (and only if) the Feedback agent later returns the single token **`TERMINATE`**,
+forward the validated report to the user unchanged.
+
+Formatting rules
+────────────────
+* End every draft (and any later revision) with the marker **REPORT_DRAFT**.
+* End the final, approved report with **REPORT_DONE**.
+"""
+
+FEEDBACK_SYS_MSG_TEMPLATE = f"""
+You are **FEEDBACK** — the reviewer and validator.
+
+Context
+───────
+Original user input ↓
+{user_input}   <!-- this will be .format()-ed in code -->
+
+How to respond
+──────────────
+1. Read the latest report from ANALYST_WRITER.
+2. If the report is accurate, clear and complete, reply **only** with the word  
+   **`TERMINATE`** (no other text).  
+   This signals approval.
+3. Otherwise, list concise bullet-point corrections or suggestions.  
+   Do **not** request additional data from the user.
+
+Never ask the user for more information; your only choices are:
+* `TERMINATE`
+* a short list of revision notes
+"""
 
 # ───────────────────────────────────────────────
 # 3. Agent factory helpers
@@ -64,7 +101,8 @@ def create_user() -> ConversableAgent:
         name="user",
         system_message="You provide KPI JSON and optional targets, then wait for the report.",
         llm_config=False,
-        human_input_mode="ALWAYS",
+        human_input_mode="NEVER", #ALWAYS,
+        default_auto_reply="TERMINATE",   # ← tells the manager we’re done
     )
 
 
@@ -81,16 +119,17 @@ def generate_report(data_blobs: List[dict], targets_text: str = "") -> str:
 
     analyst_writer = create_analyst_writer()
     feedback = create_feedback(user_input)
+
     user = create_user()
 
     pattern = AutoPattern(
         initial_agent=analyst_writer,
-        agents=[analyst_writer, feedback],
+        agents=[feedback, analyst_writer],
         user_agent=user,
         group_manager_args={"llm_config": llm_config},
     )
 
-    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=10)
+    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=4)
     return chat.chat_history[-1]["content"]   # ends **REPORT_DONE**
 
 
