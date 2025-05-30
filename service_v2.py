@@ -291,7 +291,7 @@ def generate_report(data_blobs: List[dict], targets_text: str = "") -> str:
         group_manager_args={"llm_config": llm_config},
     )
 
-    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=6)
+    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=4)
     return chat.chat_history[-1]["content"]   # ends **REPORT_DONE**
 
 
