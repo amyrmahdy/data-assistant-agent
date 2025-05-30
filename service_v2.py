@@ -59,7 +59,7 @@ ANALYST_WRITER_SYS_MSG = """
 
 
 <step1 title="Data Understanding">
-  <input>≤ 5 JSON blobs + optional plain-text targets (e.g., impressions = 150000).</input>
+  <input>≤ 5 JSON blobs + optional plain-text targets.</input>
   <validation>
     <check>null values</check>
     <check>outliers and anomalies</check>
@@ -123,6 +123,8 @@ ANALYST_WRITER_SYS_MSG = """
 </step2>
 """
 
+
+
 FEEDBACK_SYS_MSG_TEMPLATE = f"""
 <role>You are a Supervisor, Critic, and Referee.</role>
 <personality>Extremely strict, pessimistic, and detail-obsessed.</personality>
@@ -144,7 +146,7 @@ FEEDBACK_SYS_MSG_TEMPLATE = f"""
     <item>Are all concepts and subjects from the user’s JSON present in the report?</item>
     <item>Are all user targets mentioned and correctly interpreted?</item>
     <item>Does the report acknowledge nulls, outliers, and duplicates?</item>
-    <item>Are derived metrics (e.g., CTR, conversion rate) used and accurate?</item>
+    <item>Are derived metrics used and accurate?</item>
   </section>
 
   <section title="🧠 Analysis Quality">
@@ -200,7 +202,7 @@ USER_SYS_MSG_TEMPLATE = """
     <description>One or more JSON blobs, each representing a KPI across time (daily/weekly).</description>
   </json_blob>
   <optional_targets>
-    <description>Plain-text lines like: impressions = 150000</description>
+    <description>Plain-text lines</description>
   </optional_targets>
 </input_format>
 
@@ -261,6 +263,27 @@ def generate_report(data_blobs: List[dict], targets_text: str = "") -> str:
     feedback = create_feedback(user_input)
     user = create_user()
 
+    analyst_writer.description = """
+    <role>You are an Analyst / Writer.</role>
+    <goal>
+      Analyze KPI JSON data, validate integrity, compare against user targets (if any), and create a well-formatted Markdown report.
+    </goal>
+    """
+
+
+    feedback.description = """
+    <role>You are a Supervisor, Critic, and Referee.</role>
+    <task>
+      Critically evaluate the generated report. Your review must be harsh if needed. Take user input parameters seriously. Industrial standards matter. Do not miss anything.
+    </task>
+    """
+
+    user.description = """
+    <role>You are the USER.</role>
+    <behavior>You provide raw KPI data in JSON format and optionally specify performance targets.</behavior>
+    """
+
+
     pattern = AutoPattern(
         initial_agent=analyst_writer,
         agents=[feedback, analyst_writer],
@@ -268,7 +291,7 @@ def generate_report(data_blobs: List[dict], targets_text: str = "") -> str:
         group_manager_args={"llm_config": llm_config},
     )
 
-    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=4)
+    chat, *_ = initiate_group_chat(pattern=pattern, messages=user_input, max_rounds=6)
     return chat.chat_history[-1]["content"]   # ends **REPORT_DONE**
 
 
